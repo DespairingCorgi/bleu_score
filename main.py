@@ -1,5 +1,5 @@
 from bpemb import BPEmb
-from nltk.translate.bleu_score import sentence_bleu
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 from time import time
 import pandas as pd
 
@@ -12,9 +12,21 @@ def init_model(lang, dim=100, vs=16000):
     return model
 
 def bleu_score(model, ref_text, cand_text, use_decimal=True, decimal=3):
+    
+    # smoothing function for too short n-grams
+    # apply for unigram
+    smooth_method = SmoothingFunction().method1
+    
     ref_encoded = model.encode(ref_text)
     cand_encoded = model.encode(cand_text)
-    score = sentence_bleu([ref_encoded], cand_encoded)
+    
+    # weights -> auto_reweight target [unigram, bigram, trigram, fourgram]
+    # auto reweight -> reweigh when the weight condition is satisfied
+    # smoothing function -> smooth function algorithm
+    score = sentence_bleu([ref_encoded], cand_encoded,\
+        weights=[1, 0, 0, 0], auto_reweigh= True, \
+        smoothing_function=smooth_method)
+    
     if use_decimal:
         return round(score, decimal)
     else:
@@ -38,7 +50,6 @@ def get_bleu(path, ref_col, cand_col, \
     '''
     model = init_model(lang, dim, vs)
     df = pd.read_excel(path)[[ref_col, cand_col]]
-    print(df.columns)
     df["blue_score"] = df.apply(lambda x: bleu_score(model, x[ref_col], x[cand_col], use_decimal, decimal), axis=1)
     curpath = path.split('.')
     curfilename = '.'.join(curpath[:-1]) + '_bleu.' + curpath[-1]
@@ -46,4 +57,4 @@ def get_bleu(path, ref_col, cand_col, \
 
 if __name__=="__main__":
     
-    get_bleu('ROUGE score (한영100문장, 영한100문장).xlsx', 'ko_original', 'ko_matis', 'ko')
+    get_bleu('프랑프랑.xlsx', 'fr_original', 'fr_matis', 'fr')
